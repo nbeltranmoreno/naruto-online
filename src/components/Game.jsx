@@ -61,6 +61,7 @@ export default function Game({ session, onExit }) {
     // Conexion con los demas jugadores
     netRef.current = connectMultiplayer({
       uid: session.uid,
+      sala: session.sala,
       game,
       onRoster: (n) => setOnline(n)
     });
@@ -169,12 +170,15 @@ export default function Game({ session, onExit }) {
           <div className="text-[11px] mt-1">
             {netOk ? (
               <span className="text-slate-300">
-                {online} conectado{online === 1 ? '' : 's'}
-                {hud?.online ? ` · ${hud.online} aquí` : ''}
+                {online} en la sala
+                {hud?.online ? ` · ${hud.online} en esta zona` : ''}
               </span>
             ) : (
-              <span className="text-amber-400">Sin conexión · modo local</span>
+              <span className="text-amber-400">Conectando…</span>
             )}
+          </div>
+          <div className="mt-1 text-[11px] text-slate-400">
+            Sala <b className="tracking-widest text-amber-300">{session.sala}</b>
           </div>
           <div className="text-[11px] text-slate-500">Derrotados: {hud?.kills ?? 0}</div>
         </div>

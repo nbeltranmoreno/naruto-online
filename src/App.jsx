@@ -37,7 +37,7 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  const startGame = async ({ name, outfit }) => {
+  const startGame = async ({ name, outfit, sala }) => {
     const uid = user?.uid ?? guestUid();
     setLoadingSave(true);
 
@@ -50,7 +50,7 @@ export default function App() {
     }
 
     setLoadingSave(false);
-    setSession({ uid, name, outfit: save?.outfit ?? outfit, save });
+    setSession({ uid, name, sala, outfit: save?.outfit ?? outfit, save });
   };
 
   if (!authReady) {

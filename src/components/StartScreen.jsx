@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { drawNinja, OUTFITS } from '../game/sprites';
+import { crearCodigo, normalizarCodigo, codigoValido, codigoDeLaUrl, enlaceDeSala } from '../net/room';
 
 const PLAYABLE = ['naruto', 'sasuke', 'sakura', 'kakashi'];
 
@@ -53,6 +54,15 @@ export default function StartScreen({ user, loadingSave, onPlay }) {
   const [copiado, setCopiado] = useState(false);
   const enlaceRef = useRef(null);
 
+  // Codigo de sala: manda el de la direccion (te han invitado), y si no, el
+  // ultimo que usaste; y si tampoco, se crea uno nuevo.
+  const [invitado] = useState(() => codigoDeLaUrl());
+  const [sala, setSala] = useState(
+    () => invitado || localStorage.getItem('ninja-sala') || crearCodigo()
+  );
+  const salaOk = codigoValido(sala);
+  const enlaceInvitacion = salaOk ? enlaceDeSala(ENLACE_PUBLICO, sala) : ENLACE_PUBLICO;
+
   useEffect(() => {
     if (!name && user?.displayName) setName(user.displayName);
   }, [user]);
@@ -61,7 +71,7 @@ export default function StartScreen({ user, loadingSave, onPlay }) {
   // pagina no va por https), se selecciona el texto para copiarlo a mano.
   const copiarEnlace = async () => {
     try {
-      await navigator.clipboard.writeText(ENLACE_PUBLICO);
+      await navigator.clipboard.writeText(enlaceInvitacion);
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2000);
     } catch {
@@ -70,10 +80,12 @@ export default function StartScreen({ user, loadingSave, onPlay }) {
   };
 
   const play = () => {
+    if (!salaOk) return;
     const finalName = (name.trim() || 'Ninja').slice(0, 14);
     localStorage.setItem('ninja-name', finalName);
     localStorage.setItem('ninja-outfit', outfit);
-    onPlay({ name: finalName, outfit });
+    localStorage.setItem('ninja-sala', sala);
+    onPlay({ name: finalName, outfit, sala });
   };
 
   const google = async () => {
@@ -112,24 +124,62 @@ export default function StartScreen({ user, loadingSave, onPlay }) {
           ))}
         </div>
 
+        {/* Sala: quien entre con el mismo codigo juega en el mismo mundo */}
+        <div className="mt-5 rounded-lg bg-slate-800/50 ring-1 ring-slate-700 p-3">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs uppercase tracking-wide text-slate-400">
+              Código de sala
+            </span>
+            {!invitado && (
+              <button
+                type="button"
+                onClick={() => setSala(crearCodigo())}
+                className="text-[11px] text-cyan-300 hover:text-cyan-200 underline"
+              >
+                Crear otro
+              </button>
+            )}
+          </div>
+
+          <input
+            value={sala}
+            onChange={(e) => setSala(normalizarCodigo(e.target.value))}
+            onKeyDown={(e) => e.key === 'Enter' && play()}
+            placeholder="ABC12"
+            spellCheck={false}
+            className={
+              'mt-2 w-full rounded-md bg-slate-950/70 px-3 py-2.5 text-center text-2xl font-black tracking-[0.35em] text-amber-300 ring-1 outline-none ' +
+              (salaOk ? 'ring-slate-600 focus:ring-cyan-400' : 'ring-red-500/70')
+            }
+          />
+
+          <div className="mt-2 text-[11px] text-slate-500">
+            {invitado
+              ? 'Te han invitado a esta sala. Pulsa Jugar para entrar.'
+              : salaOk
+                ? 'Quien entre con este mismo código juega contigo en el mismo mundo. Escribe el de un amigo para unirte al suyo.'
+                : 'El código son 5 caracteres. No se usan O ni 0, ni I ni 1, para no confundirlos.'}
+          </div>
+        </div>
+
         <button
           onClick={play}
-          disabled={loadingSave}
-          className="mt-6 w-full rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-50 px-4 py-3 font-bold text-slate-900"
+          disabled={loadingSave || !salaOk}
+          className="mt-4 w-full rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-50 px-4 py-3 font-bold text-slate-900"
         >
           {loadingSave ? 'Cargando partida...' : 'Jugar'}
         </button>
 
-        {/* Enlace para pasarle a los amigos */}
-        <div className="mt-5 rounded-lg bg-slate-800/50 ring-1 ring-slate-700 p-3">
+        {/* Enlace de invitacion: lleva el codigo dentro */}
+        <div className="mt-4 rounded-lg bg-slate-800/50 ring-1 ring-slate-700 p-3">
           <div className="text-xs uppercase tracking-wide text-slate-400">
-            Comparte con tus amigos
+            Invita a tus amigos
           </div>
           <div className="mt-2 flex gap-2">
             <input
               ref={enlaceRef}
               readOnly
-              value={ENLACE_PUBLICO}
+              value={enlaceInvitacion}
               onFocus={(e) => e.target.select()}
               className="flex-1 min-w-0 rounded-md bg-slate-950/70 px-2.5 py-2 text-xs text-cyan-200 ring-1 ring-slate-700 outline-none focus:ring-cyan-400"
             />
@@ -147,7 +197,7 @@ export default function StartScreen({ user, loadingSave, onPlay }) {
             </button>
           </div>
           <div className="mt-2 text-[11px] text-slate-500">
-            Quien abra este enlace y pulse Jugar aparece en el mismo mapa que tú.
+            Este enlace ya lleva el código dentro: quien lo abra entra directo a tu sala.
           </div>
         </div>
 

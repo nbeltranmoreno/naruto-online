@@ -18,6 +18,36 @@ Hecho con React + Vite + Tailwind, reusando la base de AppHabitos
 
 Los círculos brillantes del mapa son portales: pisa uno para cambiar de zona.
 
+## Jugar con amigos
+
+Cada partida ocurre en una **sala**, identificada por un código de 5 caracteres.
+Quien entre con el mismo código comparte mundo: os veis moveros, pelear y lanzar
+jutsus en tiempo real.
+
+1. Abre el juego: https://nbeltranmoreno.github.io/naruto-online/
+2. Te sale un código ya generado (o escribe el de un amigo para unirte al suyo).
+3. Pulsa **Copiar enlace** y pásaselo. Ese enlace lleva el código dentro, así que
+   quien lo abra entra directo a tu sala.
+
+Solo ves a quien esté en **tu misma zona**: si alguien cruza un portal al bosque,
+desaparece de tu pantalla hasta que lo sigas.
+
+El código no lleva O ni 0, ni I ni 1, para que no se confundan al dictarlo.
+
+### Cómo funciona por dentro
+
+No hay servidor propio ni base de datos: los jugadores de una sala se mandan sus
+posiciones a través de un **servidor MQTT público**, de los que no piden registro
+(ver [`src/net/transport.js`](src/net/transport.js)). Todos son iguales, no hay
+anfitrión, así que si uno se va la sala sigue funcionando.
+
+Lo que viaja son posiciones y golpes, nada personal. Aun así el canal es público:
+cualquiera que **adivine** el código podría entrar en la sala. Por eso los códigos
+se generan al azar. Para una partida entre amigos es suficiente; no lo uses para
+nada que deba ser privado.
+
+El progreso (nivel, experiencia) es de cada uno y no se comparte.
+
 ## Zonas
 
 1. **Aldea de la Hoja** — zona segura, sin enemigos, la vida se regenera sola.
@@ -50,11 +80,11 @@ npm run migrate      # ejecuta supabase-schema.sql
 ```
 
 > ⚠️ El proyecto de Supabase del `.env` (`xbzrtmylhsjzyiajytmp`) ya no existe.
-> Mientras no se apunte a un proyecto nuevo, el juego funciona en modo local:
-> se puede jugar entero, pero **no hay multijugador** y el progreso no se
-> sincroniza entre dispositivos. Hay que actualizar `VITE_SUPABASE_URL`,
-> `VITE_SUPABASE_ANON_KEY` y `SUPABASE_DB_PASSWORD` en `.env`, y el
-> `project-ref` del pooler en `db-migrate-correct.js`.
+> Esto **no afecta al multijugador**, que no usa Supabase. Lo único que falta
+> mientras tanto es que el progreso se sincronice entre dispositivos: ahora se
+> guarda solo en el navegador de cada uno. Para arreglarlo hay que actualizar
+> `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y `SUPABASE_DB_PASSWORD` en
+> `.env`, y el `project-ref` del pooler en `db-migrate-correct.js`.
 
 ## Meter sprites de verdad (para que se vea como anime)
 
@@ -93,7 +123,9 @@ src/game/characterSheets.js dónde se conecta el arte real: una entrada por pers
 src/game/engine.js          movimiento, colisiones, IA, combate, niveles
 src/game/renderer.js        cámara y pintado (el terreno se cachea una vez por zona)
 src/game/progression.js     todo el equilibrio: vida, daño, experiencia, jutsus
-src/net/multiplayer.js      Supabase Realtime (presence + broadcast)
+src/net/room.js             codigos de sala y enlaces de invitacion
+src/net/transport.js        canal por el que hablan los jugadores (MQTT publico)
+src/net/multiplayer.js      qué se manda y cada cuánto
 ```
 
 Todos los personajes pasan por `drawCharacter()`: esa función decide si usa la

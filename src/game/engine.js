@@ -1,4 +1,4 @@
-import { TILE, WALK_SPEED, RUN_SPEED, BODY_W, BODY_H } from './constants';
+import { TILE, WALK_SPEED, RUN_SPEED, BODY_W, BODY_H, NET_TIMEOUT } from './constants';
 import { getZone, isSolidTile, tileAt, zonePixelSize } from './zones';
 import { statsForLevel, xpToNext, addXp, ENEMY_TYPES, jutsuBySlot, unlockedJutsus } from './progression';
 
@@ -511,7 +511,10 @@ export function createGame(opts) {
       const durR = r.action === 'cast' ? 0.4 : r.action === 'throw' ? 0.3 : 0.25;
       r.attackT = Math.max(0, (r.attackT || 0) - dt / durR);
       if (r.attackT === 0) r.action = null;
-      if (now - r.lastSeen > 20000) g.remote.delete(uid);
+      // Quien lleva un rato sin dar senales se da por desconectado. Al cerrar
+      // la pestana se manda un aviso, pero si el navegador se cierra de golpe
+      // no llega, y este limite es lo que evita jugadores fantasma.
+      if (now - r.lastSeen > NET_TIMEOUT) g.remote.delete(uid);
     }
   }
 
