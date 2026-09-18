@@ -18,7 +18,7 @@ import { CHARACTER_SHEETS, ENEMY_SHEETS } from './characterSheets';
 //   tearLines   lineas marcadas bajo los ojos
 //   scratchBand banda ninja rayada (la marca de los desertores)
 export const OUTFITS = {
-  itachi:  { name: 'Itachi',   suit: '#23232e', trim: '#a51f27', hair: '#2a2a38', skin: '#f0d3b4', eyes: '#d92d36', band: true,
+  itachigo: { name: 'Itachigo', suit: '#23232e', trim: '#a51f27', hair: '#2a2a38', skin: '#f0d3b4', eyes: '#d92d36', band: true,
              cloak: true, longHair: true, tearLines: true, scratchBand: true },
   naruto:  { name: 'Uzumaki',  suit: '#f28522', trim: '#1e3a8a', hair: '#ffd93d', skin: '#ffd9ae', eyes: '#3fa9f5', band: true },
   sasuke:  { name: 'Uchiha',   suit: '#2b5296', trim: '#e2e8f0', hair: '#2f2f40', skin: '#ffdcb8', eyes: '#3a3a48', band: true },
