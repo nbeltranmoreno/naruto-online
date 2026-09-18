@@ -12,7 +12,14 @@ import { CHARACTER_SHEETS, ENEMY_SHEETS } from './characterSheets';
 // Esa cabeza grande respecto al cuerpo es lo que lo hace leerse como anime y
 // no como un muneco; ademas, a vista cenital, la cara se ve aunque sea pequena.
 
+// Ademas de los colores, cada personaje puede llevar rasgos propios:
+//   cloak       capa oscura con nubes rojas
+//   longHair    melena larga por detras, que se dibuja antes que el cuerpo
+//   tearLines   lineas marcadas bajo los ojos
+//   scratchBand banda ninja rayada (la marca de los desertores)
 export const OUTFITS = {
+  itachi:  { name: 'Itachi',   suit: '#23232e', trim: '#a51f27', hair: '#2a2a38', skin: '#f0d3b4', eyes: '#d92d36', band: true,
+             cloak: true, longHair: true, tearLines: true, scratchBand: true },
   naruto:  { name: 'Uzumaki',  suit: '#f28522', trim: '#1e3a8a', hair: '#ffd93d', skin: '#ffd9ae', eyes: '#3fa9f5', band: true },
   sasuke:  { name: 'Uchiha',   suit: '#2b5296', trim: '#e2e8f0', hair: '#2f2f40', skin: '#ffdcb8', eyes: '#3a3a48', band: true },
   sakura:  { name: 'Haruno',   suit: '#e0466f', trim: '#ffe9f0', hair: '#ff9ec4', skin: '#ffdfbc', eyes: '#3fbf7f', band: true },
@@ -29,8 +36,20 @@ const INK = '#2a2036';
 
 // ---------- utilidades ----------
 
-function hexToRgb(hex) {
-  const h = hex.replace('#', '');
+// Acepta '#rrggbb', '#rgb' y 'rgb(r,g,b)'. Lo ultimo importa porque shade()
+// devuelve 'rgb(...)' y hay sitios donde se sombrea un color ya sombreado; si
+// no se admitiera, saldria un color invalido y el lienzo se quedaria pintando
+// con el color anterior, que es dificilisimo de ver de donde viene.
+function hexToRgb(color) {
+  const c = String(color).trim();
+
+  const rgb = c.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+
+  const h = c.replace('#', '');
+  if (h.length === 3) {
+    return [0, 1, 2].map((i) => parseInt(h[i] + h[i], 16));
+  }
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
@@ -165,6 +184,28 @@ export function drawNinja(ctx, x, y, opts = {}) {
 
   const dark = (c) => shade(c, -0.22);
 
+  // ---------- melena larga ----------
+  // Va antes que el cuerpo porque cae por detras de los hombros
+  if (o.longHair && !back) {
+    const anchoMelena = side ? 13 : 17;
+    cel(
+      ctx,
+      () => {
+        ctx.beginPath();
+        ctx.moveTo(-anchoMelena, -62);
+        ctx.quadraticCurveTo(-anchoMelena - 2, -34, -anchoMelena + 4, -22);
+        ctx.lineTo(anchoMelena - 4, -22);
+        ctx.quadraticCurveTo(anchoMelena + 2, -34, anchoMelena, -62);
+        ctx.closePath();
+      },
+      shade(o.hair, -0.12),
+      [-anchoMelena, -62, anchoMelena * 2, 40],
+      { ink: 1.8 }
+    );
+    // Coleta atada abajo
+    part(ctx, -4, -26, 8, 4, o.trim, { r: 2, ink: 1.4 });
+  }
+
   // ---------- piernas ----------
   // De frente las piernas tambien se separan un poco: si solo suben y bajan,
   // el personaje parece que da saltitos en vez de andar.
@@ -235,14 +276,40 @@ export function drawNinja(ctx, x, y, opts = {}) {
   torsoPath();
   ctx.clip();
   if (!back) {
-    ctx.fillStyle = o.trim;
+    // En una capa el cierre es una costura oscura; la franja de color solo
+    // queda bien en las chaquetas con cremallera.
+    ctx.fillStyle = o.cloak ? shade(o.suit, -0.5) : o.trim;
     ctx.fillRect(side ? -1.5 : -2.5, -47, side ? 3 : 5, 22);
-    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillStyle = o.cloak ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.2)';
     ctx.fillRect(side ? -1.5 : -2.5, -47, 1.2, 22);
   }
   // Hombreras mas claras
   ctx.fillStyle = shade(o.suit, 0.2);
   ctx.fillRect(-16, -48, 32, 4);
+
+  // Nubes rojas de la capa (recortadas al torso, para que no se salgan)
+  if (o.cloak) {
+    const nube = (nx, ny, s) => {
+      ctx.beginPath();
+      for (const [ox, oy, r] of [[-2.6, 0.4, 2.7], [0.6, -1.4, 3.2], [3.2, 0.6, 2.4]]) {
+        ctx.moveTo(nx + (ox + r) * s, ny + oy * s);
+        ctx.arc(nx + ox * s, ny + oy * s, r * s, 0, Math.PI * 2);
+      }
+      ctx.fillStyle = o.trim;
+      ctx.fill();
+      ctx.strokeStyle = '#f2e6e6';
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+    };
+    if (side) {
+      nube(-1, -40, 1);
+      nube(2, -30, 0.85);
+    } else {
+      nube(-7, -41, 0.95);
+      nube(7, -34, 0.85);
+      nube(-4, -28, 0.75);
+    }
+  }
   ctx.restore();
 
   // Cuello de la chaqueta
@@ -389,6 +456,16 @@ export function drawNinja(ctx, x, y, opts = {}) {
       ctx.beginPath();
       ctx.arc(cxF, bandY + 3, 1.7, 0.5, 5.1);
       ctx.stroke();
+
+      // Raya que tacha la placa: la marca de quien ha desertado de su aldea
+      if (o.scratchBand) {
+        ctx.strokeStyle = '#4a515c';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(cxF - pw / 2 + 1, bandY + 5.6);
+        ctx.lineTo(cxF + pw / 2 - 1, bandY + 0.8);
+        ctx.stroke();
+      }
     }
 
     // Cinta que ondea por detras
@@ -519,6 +596,18 @@ export function drawNinja(ctx, x, y, opts = {}) {
       ctx.moveTo(cxF - 2.4, eyeY + 9.4);
       ctx.quadraticCurveTo(cxF, eyeY + 10.8, cxF + 2.4, eyeY + 9.4);
       ctx.stroke();
+
+      // Lineas marcadas bajo los ojos
+      if (o.tearLines) {
+        ctx.strokeStyle = 'rgba(70,50,60,0.55)';
+        ctx.lineWidth = 1.4;
+        for (const s of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(cxF + s * 5.6, eyeY + 4.2);
+          ctx.quadraticCurveTo(cxF + s * 6.4, eyeY + 7.5, cxF + s * 5, eyeY + 10);
+          ctx.stroke();
+        }
+      }
 
       // Marcas en las mejillas del Uzumaki
       if (outfit === 'naruto') {

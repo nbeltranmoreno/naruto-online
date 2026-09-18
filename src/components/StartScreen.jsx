@@ -4,7 +4,7 @@ import { auth } from '../config/firebase';
 import { drawNinja, OUTFITS } from '../game/sprites';
 import { crearCodigo, normalizarCodigo, codigoValido, codigoDeLaUrl, enlaceDeSala } from '../net/room';
 
-const PLAYABLE = ['naruto', 'sasuke', 'sakura', 'kakashi'];
+const PLAYABLE = ['itachi', 'sasuke', 'sakura', 'kakashi'];
 
 // Direccion publica del juego: es la que hay que pasarle a los amigos.
 // Se escribe fija a proposito y no se saca de window.location, porque cuando
@@ -49,7 +49,7 @@ function OutfitPreview({ outfit, selected, onClick }) {
 
 export default function StartScreen({ user, loadingSave, onPlay }) {
   const [name, setName] = useState(() => localStorage.getItem('ninja-name') || '');
-  const [outfit, setOutfit] = useState(() => localStorage.getItem('ninja-outfit') || 'naruto');
+  const [outfit, setOutfit] = useState(() => localStorage.getItem('ninja-outfit') || 'itachi');
   const [authError, setAuthError] = useState('');
   const [copiado, setCopiado] = useState(false);
   const enlaceRef = useRef(null);
