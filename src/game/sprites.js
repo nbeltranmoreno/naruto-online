@@ -96,7 +96,8 @@ export function drawShadow(ctx, x, y, rw = 22, rh = 8, alpha = 0.32) {
 export function drawNinja(ctx, x, y, opts = {}) {
   const {
     dir = 'down', anim = 0, outfit = 'naruto',
-    moving = false, scale = 1, hurt = 0
+    moving = false, scale = 1, hurt = 0,
+    action = null, actionT = 0
   } = opts;
 
   const o = outfitOf(outfit);
@@ -116,12 +117,60 @@ export function drawNinja(ctx, x, y, opts = {}) {
   const bob = moving ? Math.abs(Math.sin(phase)) * 2.2 : Math.sin(anim * 0.026) * 0.7;
   ctx.translate(0, -bob);
 
+  // ---------- postura de la accion ----------
+  // actionT va de 1 a 0 mientras dura el gesto, asi que k avanza de 0 a 1.
+  const k = action ? 1 - Math.max(0, Math.min(1, actionT)) : 0;
+  // Curva de campana: vale 0 al principio y al final, y 1 a mitad del gesto
+  const bell = Math.sin(k * Math.PI);
+
+  // Angulo de cada brazo y cuanto se inclina el cuerpo hacia delante
+  let frontArm = 0;
+  let backArm = 0;
+  let lunge = 0;
+  let crouch = 0;
+
+  // OJO con el signo: el brazo cuelga hacia abajo desde el hombro, asi que al
+  // girarlo un angulo POSITIVO la mano va hacia atras y uno NEGATIVO la lleva
+  // hacia delante (hacia donde mira el personaje).
+  if (action === 'melee') {
+    // Se echa el brazo atras y lo estira de golpe hacia delante
+    frontArm = 1.35 - k * 2.5;
+    backArm = -0.5 + k * 0.9;
+    lunge = bell * 5;
+  } else if (action === 'throw') {
+    // Brazo por encima del hombro y latigazo al soltar el shuriken
+    frontArm = 2.5 - k * 3.3;
+    backArm = 0.4 - k * 0.5;
+    lunge = bell * 3.5;
+  } else if (action === 'cast') {
+    // Las dos manos al frente, cuerpo agachado concentrando chakra
+    frontArm = -1.15;
+    backArm = -1.0;
+    crouch = bell * 2.5;
+    lunge = bell * 1.5;
+  } else if (moving) {
+    // Al andar los brazos tambien giran, no solo suben y bajan
+    const balanceo = side ? 0.42 : 0.24;
+    frontArm = swing * balanceo;
+    backArm = -swing * balanceo;
+  }
+
+  // La inclinacion va siempre hacia donde mira el personaje
+  if (lunge) {
+    if (side) ctx.translate(lunge, 0);
+    else if (back) ctx.translate(0, -lunge);
+    else ctx.translate(0, lunge);
+  }
+  if (crouch) ctx.translate(0, crouch);
+
   const dark = (c) => shade(c, -0.22);
 
   // ---------- piernas ----------
+  // De frente las piernas tambien se separan un poco: si solo suben y bajan,
+  // el personaje parece que da saltitos en vez de andar.
   const legPairs = side
     ? [[-5, -swing * 8, dark(o.suit)], [-5, swing * 8, o.suit]]
-    : [[-11.5, 0, dark(o.suit)], [2.5, 0, o.suit]];
+    : [[-11.5, -swing * 2.2, dark(o.suit)], [2.5, swing * 2.2, o.suit]];
 
   legPairs.forEach(([lx, off, col], i) => {
     const lift = Math.max(0, (i === 0 ? -swing : swing) * 4);
@@ -143,9 +192,19 @@ export function drawNinja(ctx, x, y, opts = {}) {
   });
 
   // ---------- brazo de detras ----------
-  const armAngleBack = side ? swing * 9 : swing * 6;
-  const drawArm = (ax, off, col) => {
+  // Desplazamiento vertical del brazo al andar (la rotacion va aparte)
+  const armAngleBack = side ? swing * 4 : swing * 3;
+  // El brazo gira sobre el hombro, no se desplaza entero: asi el gesto de
+  // golpear o lanzar se lee de verdad.
+  const drawArm = (ax, off, col, angle = 0) => {
     ctx.save();
+    if (angle) {
+      const hombroX = ax + 3.75;
+      const hombroY = -45;
+      ctx.translate(hombroX, hombroY);
+      ctx.rotate(angle);
+      ctx.translate(-hombroX, -hombroY);
+    }
     ctx.translate(0, off * 0.35);
     part(ctx, ax, -46, 7.5, 18, col, { r: 3.5 });
     // Mano: ovalo alineado con el brazo, no una bola suelta
@@ -154,8 +213,8 @@ export function drawNinja(ctx, x, y, opts = {}) {
     ctx.restore();
   };
 
-  if (side) drawArm(-4.5, armAngleBack, shade(o.suit, -0.32));
-  else drawArm(9, armAngleBack, shade(o.suit, -0.14));
+  if (side) drawArm(-4.5, armAngleBack, shade(o.suit, -0.32), backArm);
+  else drawArm(9, armAngleBack, shade(o.suit, -0.14), -backArm);
 
   // ---------- torso ----------
   // Silueta con hombros anchos y cintura estrecha
@@ -194,8 +253,8 @@ export function drawNinja(ctx, x, y, opts = {}) {
   if (!back) part(ctx, side ? 5 : 8, -31, 6, 8, '#54422e', { r: 1.5, ink: 1.4 });
 
   // ---------- brazo de delante ----------
-  if (side) drawArm(-4.5, -armAngleBack, o.suit);
-  else drawArm(-17, -armAngleBack, o.suit);
+  if (side) drawArm(-4.5, -armAngleBack, o.suit, frontArm);
+  else drawArm(-17, -armAngleBack, o.suit, frontArm);
 
   // ---------- cabeza ----------
   // Centro de la cara y radios. La cara es ancha y con barbilla corta.
@@ -600,6 +659,12 @@ export function drawCharacter(ctx, x, y, opts = {}) {
 
   if (opts.kind === 'wolf') drawWolf(ctx, x, y, opts);
   else drawNinja(ctx, x, y, opts);
+}
+
+// Gancho de depuracion: permite dibujar poses sueltas desde la consola para
+// revisar la animacion sin tener que cazarla en marcha dentro del juego.
+if (typeof window !== 'undefined') {
+  window.__sprites = { drawNinja, drawWolf, drawCharacter };
 }
 
 // Nombre encima del personaje

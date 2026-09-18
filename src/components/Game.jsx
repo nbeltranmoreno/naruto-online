@@ -41,7 +41,7 @@ export default function Game({ session, onExit }) {
       x: session.save?.x ?? null,
       y: session.save?.y ?? null,
       input,
-      onAttackBroadcast: () => netRef.current?.sendAttack()
+      onAttackBroadcast: (action) => netRef.current?.sendAttack(action)
     });
     gameRef.current = game;
     // Gancho de depuracion: deja inspeccionar el estado desde la consola

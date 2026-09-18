@@ -91,6 +91,8 @@ export function createGame(opts) {
       level, xp,
       name, outfit,
       attackCd: 0, attackT: 0, jutsuCd: 0,
+      // 'melee' | 'throw' | 'cast': que gesto esta haciendo, para animarlo
+      action: null,
       invuln: 0, hurt: 0,
       slot: 1, running: false,
       dead: false, respawnT: 0
@@ -100,6 +102,8 @@ export function createGame(opts) {
     projectiles: [],
     floaters: [],
     bursts: [],
+    // Cosas que ocurren un instante despues (p. ej. soltar el shuriken a mitad del lanzamiento)
+    pending: [],
     remote: new Map(),
     kills: 0,
     portalCd: 0
@@ -218,14 +222,22 @@ export function createGame(opts) {
     if (p.attackCd > 0 || p.dead) return;
     p.attackCd = 0.38;
     p.attackT = 1;
-    onAttackBroadcast();
+    p.action = 'melee';
+    onAttackBroadcast('melee');
 
-    const box = meleeBox(p);
-    const dmg = statsForLevel(p.level).meleeDamage;
-    for (const e of g.enemies) {
-      if (!e.alive) continue;
-      if (pointInBox(e.x, e.y - 24, box)) damageEnemy(e, dmg, p.x, p.y);
-    }
+    // El golpe hace dano cuando el brazo llega adelante, no al empezar el
+    // gesto: si no, el enemigo sale volando antes de que le toques.
+    g.pending.push({
+      t: 0.1,
+      fn: () => {
+        const box = meleeBox(p);
+        const dmg = statsForLevel(p.level).meleeDamage;
+        for (const e of g.enemies) {
+          if (!e.alive) continue;
+          if (pointInBox(e.x, e.y - 24, box)) damageEnemy(e, dmg, p.x, p.y);
+        }
+      }
+    });
   }
 
   function castJutsu(slot) {
@@ -239,15 +251,29 @@ export function createGame(opts) {
     p.chakra -= j.cost;
     p.jutsuCd = 0.45;
     p.attackT = 1;
-    onAttackBroadcast();
+    // El shuriken se lanza con el brazo; los demas jutsus se concentran
+    p.action = j.id === 'shuriken' ? 'throw' : 'cast';
+    p.jutsuColor = j.color;
+    onAttackBroadcast(p.action);
 
+    // La direccion se fija al empezar el gesto, pero el proyectil no sale hasta
+    // que la mano llega adelante: primero se ve el movimiento y luego el efecto.
     const [vx, vy] = dirVector[p.dir];
-    g.projectiles.push({
-      x: p.x + vx * 26, y: p.y - 30 + vy * 14,
-      vx: vx * j.speed, vy: vy * j.speed,
-      radius: j.radius, color: j.color, kind: j.id,
-      damage: j.damage(p.level), pierce: j.pierce,
-      life: j.life, hits: new Set()
+    const damage = j.damage(p.level);
+    const retardo = p.action === 'cast' ? 0.16 : 0.1;
+
+    g.pending.push({
+      t: retardo,
+      fn: () => {
+        burst(p.x + vx * 26, p.y - 30 + vy * 14, j.color, 0.18);
+        g.projectiles.push({
+          x: p.x + vx * 26, y: p.y - 30 + vy * 14,
+          vx: vx * j.speed, vy: vy * j.speed,
+          radius: j.radius, color: j.color, kind: j.id,
+          damage, pierce: j.pierce,
+          life: j.life, hits: new Set()
+        });
+      }
     });
   }
 
@@ -260,6 +286,7 @@ export function createGame(opts) {
     g.player.y = at.y * TILE + TILE / 2;
     g.projectiles.length = 0;
     g.bursts.length = 0;
+    g.pending.length = 0;
     g.portalCd = 0.9;
     floater(g.player.x, g.player.y - 96, g.zone.name, '#a5f3fc', 2, true);
   }
@@ -335,7 +362,21 @@ export function createGame(opts) {
     p.jutsuCd = Math.max(0, p.jutsuCd - dt);
     p.invuln = Math.max(0, p.invuln - dt);
     p.hurt = Math.max(0, p.hurt - dt);
-    p.attackT = Math.max(0, p.attackT - dt / 0.25);
+
+    // Cada gesto dura lo suyo: concentrar un jutsu es mas lento que un punetazo
+    const duracion = p.action === 'cast' ? 0.4 : p.action === 'throw' ? 0.3 : 0.25;
+    p.attackT = Math.max(0, p.attackT - dt / duracion);
+    if (p.attackT === 0) p.action = null;
+
+    // Acciones que esperan a que el gesto llegue a su punto (soltar el arma)
+    for (let i = g.pending.length - 1; i >= 0; i--) {
+      g.pending[i].t -= dt;
+      if (g.pending[i].t <= 0) {
+        const fn = g.pending[i].fn;
+        g.pending.splice(i, 1);
+        fn();
+      }
+    }
 
     // El chakra se recupera siempre; la vida solo en zona segura
     p.chakra = Math.min(p.maxChakra, p.chakra + 7 * dt);
@@ -467,7 +508,9 @@ export function createGame(opts) {
       const moved = Math.hypot(r.x - before.x, r.y - before.y);
       r.moving = moved > 0.3;
       r.anim += moved * 0.35;
-      r.attackT = Math.max(0, (r.attackT || 0) - dt / 0.25);
+      const durR = r.action === 'cast' ? 0.4 : r.action === 'throw' ? 0.3 : 0.25;
+      r.attackT = Math.max(0, (r.attackT || 0) - dt / durR);
+      if (r.attackT === 0) r.action = null;
       if (now - r.lastSeen > 20000) g.remote.delete(uid);
     }
   }
@@ -499,7 +542,7 @@ export function createGame(opts) {
       if (!r) {
         r = {
           x: data.x, y: data.y, tx: data.x, ty: data.y,
-          dir: 'down', anim: 0, moving: false, attackT: 0,
+          dir: 'down', anim: 0, moving: false, attackT: 0, action: null,
           name: data.name || 'Ninja', level: data.level || 1,
           outfit: data.outfit || 'sasuke', zone: data.zone || 'konoha',
           lastSeen: Date.now()
@@ -516,9 +559,12 @@ export function createGame(opts) {
       r.lastSeen = Date.now();
     },
 
-    remoteAttack: (uid) => {
+    remoteAttack: (uid, action) => {
       const r = g.remote.get(uid);
-      if (r) r.attackT = 1;
+      if (r) {
+        r.attackT = 1;
+        r.action = action || 'melee';
+      }
     },
 
     removeRemote: (uid) => { g.remote.delete(uid); },

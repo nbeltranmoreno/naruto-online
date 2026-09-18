@@ -479,6 +479,42 @@ function drawBurst(ctx, b) {
   ctx.restore();
 }
 
+// Bola de chakra que crece en las manos mientras se concentra el jutsu
+function drawChakra(ctx, x, y, dir, t, color) {
+  const k = 1 - Math.max(0, Math.min(1, t));
+  const crece = Math.sin(k * Math.PI);
+  if (crece <= 0.02) return;
+
+  const [vx, vy] = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[dir] ?? [0, 1];
+  const cx = x + vx * 20;
+  const cy = y - 30 + vy * 10;
+  const r = 4 + crece * 12;
+
+  ctx.save();
+  const g = ctx.createRadialGradient(cx, cy, 1, cx, cy, r);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.45, color);
+  g.addColorStop(1, color + '00');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Chispas girando alrededor
+  ctx.globalAlpha = 0.8 * crece;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 4; i++) {
+    const a = k * 14 + (i / 4) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * (r + 2), cy + Math.sin(a) * (r + 2) * 0.6);
+    ctx.lineTo(cx + Math.cos(a) * (r + 7), cy + Math.sin(a) * (r + 7) * 0.6);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // Lineas de velocidad detras del jugador cuando corre
 function drawSpeedLines(ctx, x, y, dir, t) {
   const [vx, vy] = { up: [0, 1], down: [0, -1], left: [1, 0], right: [-1, 0] }[dir] ?? [0, -1];
@@ -620,14 +656,24 @@ export function createRenderer(canvas) {
         drawHealthBar(ctx, o.x, o.y - 94 * t.scale, o.hp / o.maxHp, o.type === 'jefe' ? 56 : 34, 5);
         if (o.type === 'jefe') drawNameTag(ctx, o.x, o.y - 106, t.name, '#e9d5ff');
       } else if (a.kind === 'remote') {
-        drawCharacter(ctx, o.x, o.y, { dir: o.dir, anim: o.anim, outfit: o.outfit, moving: o.moving });
+        if (o.action === 'cast' && o.attackT > 0) drawChakra(ctx, o.x, o.y, o.dir, o.attackT, '#67e8f9');
+        drawCharacter(ctx, o.x, o.y, {
+          dir: o.dir, anim: o.anim, outfit: o.outfit, moving: o.moving,
+          action: o.action, actionT: o.attackT
+        });
         drawNameTag(ctx, o.x, o.y - 92, o.name + " Lv"  + o.level, '#7dd3fc');
-        if (o.attackT > 0) drawSlash(ctx, o.x, o.y, o.dir, o.attackT);
+        if (o.action === 'melee' && o.attackT > 0 && o.attackT < 0.62) drawSlash(ctx, o.x, o.y, o.dir, o.attackT);
       } else {
         if (o.moving && o.running) drawSpeedLines(ctx, o.x, o.y, o.dir, g.time);
-        drawCharacter(ctx, o.x, o.y, { dir: o.dir, anim: o.anim, outfit: o.outfit, moving: o.moving, hurt: o.hurt });
+        if (o.action === 'cast' && o.attackT > 0) {
+          drawChakra(ctx, o.x, o.y, o.dir, o.attackT, o.jutsuColor || '#67e8f9');
+        }
+        drawCharacter(ctx, o.x, o.y, {
+          dir: o.dir, anim: o.anim, outfit: o.outfit, moving: o.moving, hurt: o.hurt,
+          action: o.action, actionT: o.attackT
+        });
         drawNameTag(ctx, o.x, o.y - 92, o.name, '#fde68a');
-        if (o.attackT > 0) drawSlash(ctx, o.x, o.y, o.dir, o.attackT);
+        if (o.action === 'melee' && o.attackT > 0 && o.attackT < 0.62) drawSlash(ctx, o.x, o.y, o.dir, o.attackT);
       }
     }
 

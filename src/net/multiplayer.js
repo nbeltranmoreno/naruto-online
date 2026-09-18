@@ -29,7 +29,7 @@ export function connectMultiplayer({ uid, game, onRoster = () => {} }) {
   // Otro jugador ha atacado: solo sirve para ver su animacion
   channel.on('broadcast', { event: 'attack' }, ({ payload }) => {
     if (!payload || payload.uid === uid) return;
-    game.remoteAttack(payload.uid);
+    game.remoteAttack(payload.uid, payload.action);
   });
 
   channel.on('presence', { event: 'sync' }, () => {
@@ -67,9 +67,9 @@ export function connectMultiplayer({ uid, game, onRoster = () => {} }) {
 
   return {
     isConnected: () => connected,
-    // Se llama cuando el jugador local ataca, para que los demas lo vean
-    sendAttack: () => {
-      if (connected) channel.send({ type: 'broadcast', event: 'attack', payload: { uid } });
+    // Se llama cuando el jugador local ataca, para que los demas vean el gesto
+    sendAttack: (action) => {
+      if (connected) channel.send({ type: 'broadcast', event: 'attack', payload: { uid, action } });
     },
     disconnect: () => {
       if (timer) clearInterval(timer);
