@@ -4,7 +4,8 @@ Fan game de ninjas con vista cenital: te mueves con WASD, peleas, subes de nivel
 y ves a tus amigos en el mismo mapa en tiempo real.
 
 Hecho con React + Vite + Tailwind, reusando la base de AppHabitos
-(Firebase Auth para la cuenta, Supabase para el progreso y el multijugador).
+(Firebase Auth para la cuenta y Supabase para el progreso). El multijugador no
+usa ninguna de las dos: va por salas con código, sin servidor propio.
 
 ## Controles
 
