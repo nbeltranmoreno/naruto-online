@@ -44,6 +44,8 @@ export default function Game({ session, onExit }) {
       onAttackBroadcast: () => netRef.current?.sendAttack()
     });
     gameRef.current = game;
+    // Gancho de depuracion: deja inspeccionar el estado desde la consola
+    if (typeof window !== 'undefined') window.__game = game;
 
     const renderer = createRenderer(canvasRef.current);
 

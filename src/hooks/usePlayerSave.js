@@ -16,6 +16,16 @@ let remoteDisabledUntil = 0;
 const remoteAvailable = () => Date.now() > remoteDisabledUntil;
 const disableRemote = () => { remoteDisabledUntil = Date.now() + 60000; };
 
+// Si el servidor no responde (dominio caido, sin red...), la peticion puede
+// tardar muchisimo en fallar. Sin este limite el juego se queda colgado en
+// "Cargando partida...".
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(label + ': sin respuesta')), ms))
+  ]);
+}
+
 function readLocal(uid) {
   try {
     const raw = localStorage.getItem(localKey(uid));
@@ -51,7 +61,11 @@ export async function loadPlayer(uid) {
 
   if (remoteAvailable()) {
     try {
-      const { data, error } = await supabase.from(TABLE).select('*').eq('userid', uid).maybeSingle();
+      const { data, error } = await withTimeout(
+        supabase.from(TABLE).select('*').eq('userid', uid).maybeSingle(),
+        1500,
+        'Cargar progreso'
+      );
       if (error) throw error;
       if (data) {
         const remote = fromRow(data);
@@ -76,9 +90,13 @@ export async function savePlayer(uid, name, data) {
   if (!remoteAvailable()) return false;
 
   try {
-    const { error } = await supabase.from(TABLE).upsert(
-      { userid: uid, name, ...data, updatedat: new Date().toISOString() },
-      { onConflict: 'userid' }
+    const { error } = await withTimeout(
+      supabase.from(TABLE).upsert(
+        { userid: uid, name, ...data, updatedat: new Date().toISOString() },
+        { onConflict: 'userid' }
+      ),
+      1500,
+      'Guardar progreso'
     );
     if (error) throw error;
     return true;

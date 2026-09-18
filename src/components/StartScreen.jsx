@@ -14,11 +14,11 @@ function OutfitPreview({ outfit, selected, onClick }) {
     let raf = 0;
     let t = 0;
     const loop = () => {
-      t += 1.6;
-      ctx.clearRect(0, 0, 72, 86);
+      t += 2.4;
+      ctx.clearRect(0, 0, 96, 120);
       ctx.save();
-      ctx.scale(2, 2);
-      drawNinja(ctx, 18, 40, { dir: 'down', outfit, anim: t, moving: true });
+      ctx.scale(1.15, 1.15);
+      drawNinja(ctx, 42, 100, { dir: 'down', outfit, anim: t, moving: true });
       ctx.restore();
       raf = requestAnimationFrame(loop);
     };
@@ -35,7 +35,7 @@ function OutfitPreview({ outfit, selected, onClick }) {
         (selected ? 'bg-cyan-500/20 ring-cyan-400' : 'bg-slate-800/60 ring-slate-700 hover:ring-slate-500')
       }
     >
-      <canvas ref={ref} width={72} height={86} className="mx-auto" />
+      <canvas ref={ref} width={96} height={120} className="mx-auto w-full h-auto" />
       <div className="text-[11px] mt-1 text-slate-200">{OUTFITS[outfit].name}</div>
     </button>
   );

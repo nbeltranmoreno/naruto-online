@@ -92,13 +92,14 @@ export function createGame(opts) {
       name, outfit,
       attackCd: 0, attackT: 0, jutsuCd: 0,
       invuln: 0, hurt: 0,
-      slot: 1,
+      slot: 1, running: false,
       dead: false, respawnT: 0
     },
     enemiesByZone: {},
     enemies: [],
     projectiles: [],
     floaters: [],
+    bursts: [],
     remote: new Map(),
     kills: 0,
     portalCd: 0
@@ -136,18 +137,24 @@ export function createGame(opts) {
 
   // ---------- avisos flotantes ----------
 
-  function floater(x, y, text, color, life = 0.9) {
-    g.floaters.push({ x, y, text, color, life, maxLife: life, vy: -28 });
+  function floater(x, y, text, color, life = 0.9, big = false) {
+    g.floaters.push({ x, y, text, color, life, maxLife: life, vy: -40, big });
+  }
+
+  // Estrella de impacto en el punto del golpe
+  function burst(x, y, color = '#ffe37a', life = 0.24) {
+    g.bursts.push({ x, y, color, life, maxLife: life, rot: Math.random() * Math.PI });
   }
 
   // ---------- combate ----------
 
+  // Zona a la que llega el golpe cuerpo a cuerpo, delante del personaje
   function meleeBox(p) {
     switch (p.dir) {
-      case 'right': return { x: p.x + 2, y: p.y - 32, w: 34, h: 32 };
-      case 'left': return { x: p.x - 36, y: p.y - 32, w: 34, h: 32 };
-      case 'up': return { x: p.x - 18, y: p.y - 56, w: 36, h: 32 };
-      default: return { x: p.x - 18, y: p.y - 10, w: 36, h: 34 };
+      case 'right': return { x: p.x + 4, y: p.y - 56, w: 52, h: 54 };
+      case 'left': return { x: p.x - 56, y: p.y - 56, w: 52, h: 54 };
+      case 'up': return { x: p.x - 28, y: p.y - 92, w: 56, h: 52 };
+      default: return { x: p.x - 28, y: p.y - 16, w: 56, h: 56 };
     }
   }
 
@@ -156,32 +163,35 @@ export function createGame(opts) {
   function damageEnemy(e, amount, fromX, fromY) {
     e.hp -= amount;
     e.hurt = 0.28;
-    floater(e.x, e.y - 46, String(Math.round(amount)), '#fca5a5');
+    floater(e.x, e.y - 72, String(Math.round(amount)), '#ffd6d6');
+    burst(e.x, e.y - 30, '#ffe37a');
     // Empujon en la direccion del golpe
     const dx = e.x - fromX;
     const dy = e.y - fromY;
     const d = Math.hypot(dx, dy) || 1;
-    e.knockX = (dx / d) * 130;
-    e.knockY = (dy / d) * 130;
+    e.knockX = (dx / d) * 190;
+    e.knockY = (dy / d) * 190;
 
     if (e.hp <= 0) {
       e.alive = false;
       e.respawnT = 14;
       g.kills++;
+      burst(e.x, e.y - 30, '#ffffff', 0.35);
       const before = g.player.level;
       const res = addXp(g.player.level, g.player.xp, e.def.xp);
       g.player.level = res.level;
       g.player.xp = res.xp;
-      floater(e.x, e.y - 58, '+' + e.def.xp + ' XP', '#86efac', 1.2);
+      floater(e.x, e.y - 88, '+' + e.def.xp + ' XP', '#86efac', 1.2);
       if (res.level > before) {
         const st = statsForLevel(res.level);
         g.player.maxHp = st.maxHp;
         g.player.maxChakra = st.maxChakra;
         g.player.hp = st.maxHp;
         g.player.chakra = st.maxChakra;
-        floater(g.player.x, g.player.y - 62, 'NIVEL ' + res.level, '#fde68a', 2);
+        floater(g.player.x, g.player.y - 96, '¡NIVEL ' + res.level + '!', '#fde68a', 2, true);
+        burst(g.player.x, g.player.y - 34, '#fde68a', 0.5);
         const nuevo = unlockedJutsus(res.level).find((j) => j.level === res.level);
-        if (nuevo) floater(g.player.x, g.player.y - 80, 'Nuevo jutsu: ' + nuevo.name, '#67e8f9', 2.4);
+        if (nuevo) floater(g.player.x, g.player.y - 120, 'Nuevo jutsu: ' + nuevo.name, '#67e8f9', 2.4);
       }
     }
   }
@@ -192,7 +202,8 @@ export function createGame(opts) {
     p.hp -= amount;
     p.invuln = 0.65;
     p.hurt = 0.35;
-    floater(p.x, p.y - 48, '-' + Math.round(amount), '#ef4444');
+    floater(p.x, p.y - 76, '-' + Math.round(amount), '#ff6b6b');
+    burst(p.x, p.y - 30, '#ff8a8a', 0.22);
     if (p.hp <= 0) {
       p.hp = 0;
       p.dead = true;
@@ -213,7 +224,7 @@ export function createGame(opts) {
     const dmg = statsForLevel(p.level).meleeDamage;
     for (const e of g.enemies) {
       if (!e.alive) continue;
-      if (pointInBox(e.x, e.y - 14, box)) damageEnemy(e, dmg, p.x, p.y);
+      if (pointInBox(e.x, e.y - 24, box)) damageEnemy(e, dmg, p.x, p.y);
     }
   }
 
@@ -221,9 +232,9 @@ export function createGame(opts) {
     const p = g.player;
     const j = jutsuBySlot(slot);
     if (!j || p.dead) return;
-    if (p.level < j.level) { floater(p.x, p.y - 56, 'Bloqueado (Nv ' + j.level + ')', '#fca5a5'); return; }
+    if (p.level < j.level) { floater(p.x, p.y - 88, 'Bloqueado (Nv ' + j.level + ')', '#fca5a5'); return; }
     if (p.jutsuCd > 0) return;
-    if (p.chakra < j.cost) { floater(p.x, p.y - 56, 'Sin chakra', '#93c5fd'); return; }
+    if (p.chakra < j.cost) { floater(p.x, p.y - 88, 'Sin chakra', '#93c5fd'); return; }
 
     p.chakra -= j.cost;
     p.jutsuCd = 0.45;
@@ -232,7 +243,7 @@ export function createGame(opts) {
 
     const [vx, vy] = dirVector[p.dir];
     g.projectiles.push({
-      x: p.x + vx * 16, y: p.y - 16 + vy * 10,
+      x: p.x + vx * 26, y: p.y - 30 + vy * 14,
       vx: vx * j.speed, vy: vy * j.speed,
       radius: j.radius, color: j.color, kind: j.id,
       damage: j.damage(p.level), pierce: j.pierce,
@@ -248,8 +259,9 @@ export function createGame(opts) {
     g.player.x = at.x * TILE + TILE / 2;
     g.player.y = at.y * TILE + TILE / 2;
     g.projectiles.length = 0;
+    g.bursts.length = 0;
     g.portalCd = 0.9;
-    floater(g.player.x, g.player.y - 62, g.zone.name, '#a5f3fc', 2);
+    floater(g.player.x, g.player.y - 96, g.zone.name, '#a5f3fc', 2, true);
   }
 
   function checkPortals() {
@@ -306,13 +318,16 @@ export function createGame(opts) {
       // Normalizar: moverse en diagonal no debe ser mas rapido
       const len = Math.hypot(dx, dy);
       dx /= len; dy /= len;
-      const speed = input && input.isDown('run') ? RUN_SPEED : WALK_SPEED;
+      p.running = !!(input && input.isDown('run'));
+      const speed = p.running ? RUN_SPEED : WALK_SPEED;
       moveWithCollision(g.zone, p, dx * speed * dt, dy * speed * dt);
       p.dir = dirFromVector(dx, dy);
       p.anim += speed * dt * 0.35;
       p.moving = true;
     } else {
       p.moving = false;
+      p.running = false;
+      p.anim += dt * 60;
     }
 
     // Temporizadores del jugador
@@ -361,7 +376,7 @@ export function createGame(opts) {
         // Persecucion
         const nx = ddx / (dist || 1);
         const ny = ddy / (dist || 1);
-        if (dist > 20) {
+        if (dist > 30) {
           moveWithCollision(g.zone, e, nx * e.def.speed * dt, ny * e.def.speed * dt);
           e.anim += e.def.speed * dt * 0.4;
           e.moving = true;
@@ -371,7 +386,7 @@ export function createGame(opts) {
         e.dir = dirFromVector(ddx, ddy);
 
         // Golpe por contacto
-        if (dist < 26 && e.atkCd <= 0) {
+        if (dist < 40 && e.atkCd <= 0) {
           e.atkCd = 1.1;
           damagePlayer(e.def.damage);
         }
@@ -407,12 +422,12 @@ export function createGame(opts) {
       pr.y += pr.vy * dt;
       pr.life -= dt;
 
-      let remove = pr.life <= 0 || isSolidTile(tileAt(g.zone, pr.x, pr.y + 12));
+      let remove = pr.life <= 0 || isSolidTile(tileAt(g.zone, pr.x, pr.y + 20));
 
       if (!remove) {
         for (const e of g.enemies) {
           if (!e.alive || pr.hits.has(e)) continue;
-          if (Math.hypot(e.x - pr.x, e.y - 14 - pr.y) < pr.radius + 14) {
+          if (Math.hypot(e.x - pr.x, e.y - 26 - pr.y) < pr.radius + 20) {
             pr.hits.add(e);
             damageEnemy(e, pr.damage, pr.x, pr.y);
             pr.pierce--;
@@ -421,7 +436,16 @@ export function createGame(opts) {
         }
       }
 
-      if (remove) g.projectiles.splice(i, 1);
+      if (remove) {
+        if (pr.life > 0) burst(pr.x, pr.y, pr.color, 0.2);
+        g.projectiles.splice(i, 1);
+      }
+    }
+
+    // --- estrellas de impacto ---
+    for (let i = g.bursts.length - 1; i >= 0; i--) {
+      g.bursts[i].life -= dt;
+      if (g.bursts[i].life <= 0) g.bursts.splice(i, 1);
     }
 
     // --- avisos flotantes ---
