@@ -1,6 +1,6 @@
 import { TILE, VIEW_W, VIEW_H } from './constants';
 import { zonePixelSize } from './zones';
-import { drawNinja, drawWolf, drawAura, drawHealthBar, drawNameTag, shade } from './sprites';
+import { drawCharacter, drawAura, drawHealthBar, drawNameTag, shade } from './sprites';
 
 // Estilo: colores vivos y planos, contornos oscuros y sombras en banda dura.
 // Es el mismo criterio que en sprites.js, para que personajes y escenario
@@ -612,20 +612,20 @@ export function createRenderer(canvas) {
       if (a.kind === 'enemy') {
         const t = o.def;
         if (o.type === 'jefe') drawAura(ctx, o.x, o.y, g.time);
-        if (t.kind === 'wolf') {
-          drawWolf(ctx, o.x, o.y, { dir: o.dir, anim: o.anim, moving: o.moving, hurt: o.hurt });
-        } else {
-          drawNinja(ctx, o.x, o.y, { dir: o.dir, anim: o.anim, outfit: t.outfit, moving: o.moving, scale: t.scale, hurt: o.hurt });
-        }
+        drawCharacter(ctx, o.x, o.y, {
+          dir: o.dir, anim: o.anim, moving: o.moving, hurt: o.hurt,
+          outfit: t.outfit, scale: t.scale, kind: t.kind,
+          enemy: true, sheetId: o.type
+        });
         drawHealthBar(ctx, o.x, o.y - 94 * t.scale, o.hp / o.maxHp, o.type === 'jefe' ? 56 : 34, 5);
         if (o.type === 'jefe') drawNameTag(ctx, o.x, o.y - 106, t.name, '#e9d5ff');
       } else if (a.kind === 'remote') {
-        drawNinja(ctx, o.x, o.y, { dir: o.dir, anim: o.anim, outfit: o.outfit, moving: o.moving });
+        drawCharacter(ctx, o.x, o.y, { dir: o.dir, anim: o.anim, outfit: o.outfit, moving: o.moving });
         drawNameTag(ctx, o.x, o.y - 92, o.name + " Lv"  + o.level, '#7dd3fc');
         if (o.attackT > 0) drawSlash(ctx, o.x, o.y, o.dir, o.attackT);
       } else {
         if (o.moving && o.running) drawSpeedLines(ctx, o.x, o.y, o.dir, g.time);
-        drawNinja(ctx, o.x, o.y, { dir: o.dir, anim: o.anim, outfit: o.outfit, moving: o.moving, hurt: o.hurt });
+        drawCharacter(ctx, o.x, o.y, { dir: o.dir, anim: o.anim, outfit: o.outfit, moving: o.moving, hurt: o.hurt });
         drawNameTag(ctx, o.x, o.y - 92, o.name, '#fde68a');
         if (o.attackT > 0) drawSlash(ctx, o.x, o.y, o.dir, o.attackT);
       }

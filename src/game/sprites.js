@@ -1,6 +1,12 @@
+import { getSheet, sheetUsable, drawSheetFrame } from './spritesheet';
+import { CHARACTER_SHEETS, ENEMY_SHEETS } from './characterSheets';
+
 // Los personajes se dibujan por codigo, sin imagenes, con criterio de dibujo
 // animado: color plano, una sola banda de sombra dura, un brillo duro y
 // contorno grueso de color violeta oscuro (nunca negro puro).
+//
+// Esto es el respaldo: en cuanto se configure una hoja de sprites en
+// characterSheets.js, drawCharacter usa el arte real en su lugar.
 //
 // Proporciones: el personaje mide unos 74px y la cabeza ocupa casi el 40%.
 // Esa cabeza grande respecto al cuerpo es lo que lo hace leerse como anime y
@@ -581,6 +587,19 @@ export function drawHealthBar(ctx, x, y, pct, w = 34, h = 5) {
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.fillRect(left, top, Math.max(0, w * Math.max(0, pct)), 1.6);
   ctx.restore();
+}
+
+// Punto unico por el que pasa el dibujo de TODOS los personajes.
+// Si hay una hoja de sprites configurada y cargada, usa el arte real;
+// si no, dibuja por codigo. El resto del juego no sabe cual de las dos es.
+export function drawCharacter(ctx, x, y, opts = {}) {
+  const tabla = opts.enemy ? ENEMY_SHEETS : CHARACTER_SHEETS;
+  const sheet = getSheet(tabla[opts.sheetId || opts.outfit]);
+
+  if (sheetUsable(sheet) && drawSheetFrame(ctx, sheet, x, y, opts)) return;
+
+  if (opts.kind === 'wolf') drawWolf(ctx, x, y, opts);
+  else drawNinja(ctx, x, y, opts);
 }
 
 // Nombre encima del personaje
