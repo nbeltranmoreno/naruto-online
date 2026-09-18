@@ -67,7 +67,7 @@ export default function StartScreen({ user, loadingSave, onPlay }) {
   };
 
   return (
-    <div className="min-h-full grid place-items-center p-6">
+    <div className="h-full overflow-y-auto grid place-items-center p-6">
       <div className="w-full max-w-lg rounded-2xl bg-slate-900/80 ring-1 ring-slate-700 p-6 shadow-2xl">
         <h1 className="text-3xl font-black tracking-tight text-amber-300">NINJA ONLINE</h1>
         <p className="text-sm text-slate-400 mt-1">

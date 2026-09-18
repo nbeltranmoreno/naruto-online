@@ -536,11 +536,37 @@ function drawSpeedLines(ctx, x, y, dir, t) {
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
-  canvas.width = VIEW_W;
-  canvas.height = VIEW_H;
+
+  // El juego ocupa toda la ventana, sea del tamano que sea. `view` guarda
+  // cuanto mundo cabe en pantalla (en pixeles de juego) y cuanto se amplia.
+  //   - zoom: se calcula respecto a VIEW_H para que en una pantalla grande el
+  //     personaje se vea igual de grande, no diminuto.
+  //   - dpr: pixeles reales por pixel CSS, para que no se vea borroso.
+  const view = { w: VIEW_W, h: VIEW_H, zoom: 1, dpr: 1 };
+
+  function resize() {
+    const cssW = canvas.clientWidth || VIEW_W;
+    const cssH = canvas.clientHeight || VIEW_H;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const zoom = Math.max(1, Math.min(3, cssH / VIEW_H));
+
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+
+    view.w = cssW / zoom;
+    view.h = cssH / zoom;
+    view.zoom = zoom;
+    view.dpr = dpr;
+
+    // Recolocar las hojas que se hayan quedado fuera del nuevo tamano
+    for (const m of motes) {
+      if (m.x > view.w) m.x = Math.random() * view.w;
+      if (m.y > view.h) m.y = Math.random() * view.h;
+    }
+  }
 
   // Hojas y polvo que flotan por la pantalla: cuestan nada y dan mucha vida
-  const motes = Array.from({ length: 26 }, () => ({
+  const motes = Array.from({ length: 30 }, () => ({
     x: Math.random() * VIEW_W,
     y: Math.random() * VIEW_H,
     s: 1.5 + Math.random() * 3,
@@ -557,8 +583,8 @@ export function createRenderer(canvas) {
       m.x += m.vx * dt;
       m.y += m.vy * dt;
       m.rot += m.spin * dt;
-      if (m.x < -10) { m.x = VIEW_W + 10; m.y = Math.random() * VIEW_H; }
-      if (m.y > VIEW_H + 10) { m.y = -10; m.x = Math.random() * VIEW_W; }
+      if (m.x < -10) { m.x = view.w + 10; m.y = Math.random() * view.h; }
+      if (m.y > view.h + 10) { m.y = -10; m.x = Math.random() * view.w; }
 
       ctx.save();
       ctx.translate(m.x, m.y);
@@ -599,12 +625,17 @@ export function createRenderer(canvas) {
     const { w: worldW, h: worldH } = zonePixelSize(zone);
 
     // Camara centrada en el jugador pero sin salirse del mapa
-    const camX = Math.round(Math.min(Math.max(g.player.x - VIEW_W / 2, 0), Math.max(0, worldW - VIEW_W)));
-    const camY = Math.round(Math.min(Math.max(g.player.y - VIEW_H / 2, 0), Math.max(0, worldH - VIEW_H)));
+    // Todo el dibujado va en pixeles de juego; esta transformacion se encarga
+    // de ampliarlo para llenar la ventana con la nitidez de la pantalla.
+    const k = view.zoom * view.dpr;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+
+    const camX = Math.round(Math.min(Math.max(g.player.x - view.w / 2, 0), Math.max(0, worldW - view.w)));
+    const camY = Math.round(Math.min(Math.max(g.player.y - view.h / 2, 0), Math.max(0, worldH - view.h)));
 
     ctx.fillStyle = '#0b1220';
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    ctx.drawImage(bg, camX, camY, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
+    ctx.fillRect(0, 0, view.w, view.h);
+    ctx.drawImage(bg, camX, camY, view.w, view.h, 0, 0, view.w, view.h);
 
     ctx.save();
     ctx.translate(-camX, -camY);
@@ -747,26 +778,30 @@ export function createRenderer(canvas) {
     // --- capa de ambiente, ya en coordenadas de pantalla ---
     const tint = TINTS[zone.id] || TINTS.konoha;
     ctx.fillStyle = tint.color;
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.fillRect(0, 0, view.w, view.h);
 
     drawMotes(dt, zone);
 
-    // Vineteado: oscurece los bordes y centra la mirada
+    // Vineteado: oscurece los bordes y centra la mirada.
+    // El radio sale de la diagonal para que funcione en cualquier proporcion
+    // de pantalla, no solo en 16:9.
+    const diag = Math.hypot(view.w, view.h) / 2;
     const vg = ctx.createRadialGradient(
-      VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.35,
-      VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.85
+      view.w / 2, view.h / 2, diag * 0.55,
+      view.w / 2, view.h / 2, diag * 1.25
     );
     vg.addColorStop(0, 'rgba(0,0,0,0)');
     vg.addColorStop(1, `rgba(8,6,20,${tint.vignette})`);
     ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.fillRect(0, 0, view.w, view.h);
 
     // Destello rojo al recibir dano
     if (g.player.hurt > 0) {
       ctx.fillStyle = `rgba(220,40,40,${Math.min(0.32, g.player.hurt * 0.75)})`;
-      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      ctx.fillRect(0, 0, view.w, view.h);
     }
   }
 
-  return { render };
+  resize();
+  return { render, resize, view };
 }
