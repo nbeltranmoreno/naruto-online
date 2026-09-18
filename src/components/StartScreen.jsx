@@ -5,6 +5,11 @@ import { drawNinja, OUTFITS } from '../game/sprites';
 
 const PLAYABLE = ['naruto', 'sasuke', 'sakura', 'kakashi'];
 
+// Direccion publica del juego: es la que hay que pasarle a los amigos.
+// Se escribe fija a proposito y no se saca de window.location, porque cuando
+// se prueba en el ordenador la direccion es localhost y a un amigo no le sirve.
+const ENLACE_PUBLICO = 'https://nbeltranmoreno.github.io/naruto-online/';
+
 // Vista previa del personaje: se dibuja con el mismo codigo que usa el juego
 function OutfitPreview({ outfit, selected, onClick }) {
   const ref = useRef(null);
@@ -45,10 +50,24 @@ export default function StartScreen({ user, loadingSave, onPlay }) {
   const [name, setName] = useState(() => localStorage.getItem('ninja-name') || '');
   const [outfit, setOutfit] = useState(() => localStorage.getItem('ninja-outfit') || 'naruto');
   const [authError, setAuthError] = useState('');
+  const [copiado, setCopiado] = useState(false);
+  const enlaceRef = useRef(null);
 
   useEffect(() => {
     if (!name && user?.displayName) setName(user.displayName);
   }, [user]);
+
+  // Copiar el enlace al portapapeles. Si el navegador no deja (pasa cuando la
+  // pagina no va por https), se selecciona el texto para copiarlo a mano.
+  const copiarEnlace = async () => {
+    try {
+      await navigator.clipboard.writeText(ENLACE_PUBLICO);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      enlaceRef.current?.select();
+    }
+  };
 
   const play = () => {
     const finalName = (name.trim() || 'Ninja').slice(0, 14);
@@ -100,6 +119,37 @@ export default function StartScreen({ user, loadingSave, onPlay }) {
         >
           {loadingSave ? 'Cargando partida...' : 'Jugar'}
         </button>
+
+        {/* Enlace para pasarle a los amigos */}
+        <div className="mt-5 rounded-lg bg-slate-800/50 ring-1 ring-slate-700 p-3">
+          <div className="text-xs uppercase tracking-wide text-slate-400">
+            Comparte con tus amigos
+          </div>
+          <div className="mt-2 flex gap-2">
+            <input
+              ref={enlaceRef}
+              readOnly
+              value={ENLACE_PUBLICO}
+              onFocus={(e) => e.target.select()}
+              className="flex-1 min-w-0 rounded-md bg-slate-950/70 px-2.5 py-2 text-xs text-cyan-200 ring-1 ring-slate-700 outline-none focus:ring-cyan-400"
+            />
+            <button
+              type="button"
+              onClick={copiarEnlace}
+              className={
+                'rounded-md px-3 py-2 text-xs font-semibold whitespace-nowrap transition ' +
+                (copiado
+                  ? 'bg-emerald-500 text-slate-900'
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-100')
+              }
+            >
+              {copiado ? '¡Copiado!' : 'Copiar enlace'}
+            </button>
+          </div>
+          <div className="mt-2 text-[11px] text-slate-500">
+            Quien abra este enlace y pulse Jugar aparece en el mismo mapa que tú.
+          </div>
+        </div>
 
         <div className="mt-4 flex items-center justify-between text-xs">
           {user ? (
